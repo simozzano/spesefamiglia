@@ -560,7 +560,7 @@ function daGiustificare(state) {
   for (const e of state.spese) {
     const m = [];
     if (/\?\?/.test(e.dettaglio || '')) m.push('?? in dettaglio');
-    if (/\?\?/.test(e.vario || '')) m.push('?? in vario');
+    if (/\?\?/.test(e.vario || '')) m.push('?? in negozio');
     if (!e.categoria) m.push('senza categoria');
     if (!e.data) m.push('senza data');
     if (m.length) out.push({ e, motivi: m });
@@ -678,13 +678,13 @@ function buildSheets(state, versione, now) {
   sheets.push({ name: 'Riassunto', rows: rr, cols: [16, ...Array(nCols - 1).fill(13)], freeze: { row: 3, col: 1 }, rowHeights: { 2: 32 }, active: true });
 
   // ---- Spese
-  const sp = [hdrRow(['Data', 'Categoria', 'Dettaglio', 'Spesa', 'Pagato da', 'Vario'])];
+  const sp = [hdrRow(['Data', 'Categoria', 'Dettaglio', 'Spesa', 'Pagato da', 'Negozio'])];
   state.spese.forEach(e => sp.push([e.data ? { d: e.data, s: ST.date } : null, e.categoria, e.dettaglio, { v: e.spesa, s: ST.eur }, e.pagato, e.vario]));
   sheets.push({ name: 'Spese', rows: sp, cols: [12, 22, 32, 11, 14, 22], freeze: { row: 1 }, filter: 'A1:F' + Math.max(2, sp.length),
     validations: [{ sqref: 'B2:B' + MAXR, formula: 'Categorie!$A$2:$A$200' }, { sqref: 'E2:E' + MAXR, formula: 'Persone!$A$2:$A$50' }] });
 
   // ---- Storico
-  const stor = [hdrRow(['Anno', 'Data', 'Categoria', 'Dettaglio', 'Spesa', 'Pagato da', 'Vario'])];
+  const stor = [hdrRow(['Anno', 'Data', 'Categoria', 'Dettaglio', 'Spesa', 'Pagato da', 'Negozio'])];
   state.storico.forEach(e => stor.push([e.anno, e.data ? { d: e.data, s: ST.date } : null, e.categoria, e.dettaglio, { v: e.spesa, s: ST.eur }, e.pagato, e.vario]));
   sheets.push({ name: 'Storico', rows: stor, cols: [8, 12, 22, 32, 11, 14, 22], freeze: { row: 1 }, filter: 'A1:G' + Math.max(2, stor.length) });
 
@@ -1131,7 +1131,7 @@ function formFields(name, f) {
     + '<div><span class="l" style="display:block;font-size:.84rem;font-weight:600;margin-bottom:5px;color:var(--ink2)">Pagato da</span><div class="seg" role="radiogroup" aria-label="Pagato da">'
     + pers.map(p => '<label><input type="radio" name="' + name + '_pag" data-f="pagato" value="' + h(p) + '" ' + (p === f.pagato ? 'checked' : '') + '><span>' + h(p) + '</span></label>').join('') + '</div></div>'
     + '<div><label class="l" for="' + name + '_det">Dettaglio</label><input type="text" id="' + name + '_det" data-f="dettaglio" list="dl-det" autocomplete="off" value="' + h(f.dettaglio) + '"></div>'
-    + '<div><label class="l" for="' + name + '_var">Vario</label><input type="text" id="' + name + '_var" data-f="vario" list="dl-var" autocomplete="off" value="' + h(f.vario) + '"></div>'
+    + '<div><label class="l" for="' + name + '_var">Negozio</label><input type="text" id="' + name + '_var" data-f="vario" list="dl-var" autocomplete="off" value="' + h(f.vario) + '"></div>'
     + '<div class="dup"></div>'
     + '<datalist id="dl-det">' + uniq('dettaglio').map(v => '<option value="' + h(v) + '">').join('') + '</datalist><datalist id="dl-var">' + uniq('vario').map(v => '<option value="' + h(v) + '">').join('') + '</datalist>'
     + '</div>';
@@ -1140,7 +1140,7 @@ function dupInfo(f, excludeId) {
   const c = toCand(f);
   if (!(c.categoria && c.spesa > 0 && c.pagato)) return { html: '', blocked: false };
   const d = C.checkDuplicati(S, c, excludeId);
-  const tags = m => (m.mData ? '<span class="tag">stessa data</span>' : '') + (m.mDet && (m.e.dettaglio || c.dettaglio) ? '<span class="tag">stesso dettaglio</span>' : '') + (m.mVar && (m.e.vario || c.vario) ? '<span class="tag">stesso vario</span>' : '');
+  const tags = m => (m.mData ? '<span class="tag">stessa data</span>' : '') + (m.mDet && (m.e.dettaglio || c.dettaglio) ? '<span class="tag">stesso dettaglio</span>' : '') + (m.mVar && (m.e.vario || c.vario) ? '<span class="tag">stesso negozio</span>' : '');
   const li = m => '<li><span class="num">' + fmtDate(m.e.data) + '</span> · ' + h(m.e.dettaglio || '—') + ' · ' + h(m.e.vario || '—') + tags(m) + '</li>';
   let html = '', blocked = false;
   if (d.strict.length) {
@@ -1148,7 +1148,7 @@ function dupInfo(f, excludeId) {
     html += '<div class="msg block"><b class="t">Spesa già presente (' + d.strict.length + ')</b>Stessa categoria, stesso importo e stesso pagante:<ul>' + d.strict.slice(0, 5).map(li).join('') + '</ul>'
       + (C.DUP_OVERRIDE ? '<label class="chk"><input type="checkbox" data-f="override" ' + (f.override ? 'checked' : '') + '><span>È una spesa diversa (es. ricorrente): voglio inserirla comunque</span></label>' : '') + '</div>';
   }
-  if (d.soft.length) html += '<div class="msg warn"><b class="t">Controlla: stessa data, dettaglio e vario</b>Esiste già una spesa con gli stessi dati descrittivi, ma categoria, importo o pagante diversi:<ul>' + d.soft.slice(0, 5).map(li).join('') + '</ul></div>';
+  if (d.soft.length) html += '<div class="msg warn"><b class="t">Controlla: stessa data, dettaglio e negozio</b>Esiste già una spesa con gli stessi dati descrittivi, ma categoria, importo o pagante diversi:<ul>' + d.soft.slice(0, 5).map(li).join('') + '</ul></div>';
   return { html, blocked };
 }
 function updateDup(name, onlyButton) {
